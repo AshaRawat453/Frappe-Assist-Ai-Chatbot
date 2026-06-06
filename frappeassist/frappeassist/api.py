@@ -16,39 +16,33 @@ def create_session():
     return {
         "session_name": session.name
     }
-
 @frappe.whitelist()
 def ask_ai(message, session_name):
 
-    session = frappe.get_doc(
-        "Chat Session",
-        session_name
-    )
+    session = frappe.get_doc("Chat Session", session_name)
 
-    session.append(
-        "conversation_history",
-        {
-            "role": "User",
-            "message": message,
-            "timestamp": now()
-        }
-    )
+    session.append("conversation_history", {
+        "role": "User",
+        "message": message,
+        "timestamp": now()
+    })
+
+    session.save(ignore_permissions=True)
+    frappe.db.commit()
 
     ai_reply = get_ai_response(message)
 
-    session.append(
-        "conversation_history",
-        {
-            "role": "Assistant",
-            "message": ai_reply,
-            "timestamp": now()
-        }
-    )
+    session.reload()
+
+    session.append("conversation_history", {
+        "role": "Assistant",
+        "message": ai_reply,
+        "timestamp": now()
+    })
 
     session.last_message_on = now()
 
-    session.save()
+    session.save(ignore_permissions=True)
+    frappe.db.commit()
 
-    return {
-        "reply": ai_reply
-    }
+    return {"reply": ai_reply}
