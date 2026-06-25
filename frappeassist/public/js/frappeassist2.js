@@ -1,8 +1,52 @@
 $(document).ready(async function () {
-
 	if ($("#frappeassist-fab").length) return;
 	window.frappeassist_session = null;
-	
+
+	async function loadSessions() {
+		const r = await frappe.call({
+			method: "frappeassist.frappeassist.api.get_sessions"
+		});
+
+		let html = "";
+
+		r.message.forEach(chat => {
+			const isActive = chat.name === window.frappeassist_session ? "active" : "";
+			html += `
+				<div class="fa-session ${isActive}"
+					data-name="${chat.name}">
+					${chat.title || "New Chat"}
+				</div>
+			`;
+		});
+
+		$("#fa-chat-list").html(html);
+	}
+	async function loadChatHistory(session_name) {
+
+		const r = await frappe.call({
+			method: "frappeassist.frappeassist.api.get_chat_history",
+			args: { session_name }
+		});
+
+		$("#fa-messages").html("");
+
+		r.message.forEach(msg => {
+
+			const isUser = msg.role === "User";
+
+			$("#fa-messages").append(`
+				<div class="fa-msg-wrap ${isUser ? 'fa-user-wrap' : 'fa-bot-wrap'}">
+					<div class="${isUser ? 'fa-user-msg' : 'fa-bot-msg'}">
+						<span class="fa-msg-text">
+							${escapeHtml(msg.message)}
+						</span>
+					</div>
+				</div>
+			`);
+		});
+
+		scrollToBottom();
+	}
 	$("body").append(`
 		<div id="frappeassist-fab" title="FrappeAssist AI">
 			<div class="fab-ring"></div>
@@ -28,87 +72,101 @@ $(document).ready(async function () {
 
 			<canvas id="fa-canvas"></canvas>
 
-			<div id="fa-header">
-				<div class="fa-header-left">
-					<div class="fa-status-dot"></div>
-					<div>
-						<div class="fa-title">FrappeAssist</div>
-						<div class="fa-subtitle">AI · Online</div>
-					</div>
-				</div>
-				<div class="fa-header-actions">
-					<button class="fa-icon-btn" id="fa-clear" title="Clear chat">
-						<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
-							<polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4h6v2"/>
-						</svg>
-					</button>
-					<button class="fa-icon-btn" id="fa-close" title="Close">
-						<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
-							<line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
-						</svg>
-					</button>
-				</div>
+			<div id="fa-sidebar">
+
+				<button id="fa-new-chat">
+					+ New Chat
+				</button>
+
+				<div id="fa-chat-list"></div>
+
 			</div>
 
-			<div id="fa-messages">
-				<div class="fa-msg-wrap fa-bot-wrap">
-					<div class="fa-avatar fa-bot-avatar">
-						<svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-							<circle cx="12" cy="12" r="3" fill="currentColor"/>
-							<circle cx="5" cy="7" r="1.2" fill="currentColor" opacity="0.6"/>
-							<circle cx="19" cy="7" r="1.2" fill="currentColor" opacity="0.6"/>
-							<circle cx="5" cy="17" r="1.2" fill="currentColor" opacity="0.6"/>
-							<circle cx="19" cy="17" r="1.2" fill="currentColor" opacity="0.6"/>
-							<line x1="5" y1="7" x2="12" y2="12" stroke="currentColor" stroke-width="0.8" opacity="0.5"/>
-							<line x1="19" y1="7" x2="12" y2="12" stroke="currentColor" stroke-width="0.8" opacity="0.5"/>
-							<line x1="5" y1="17" x2="12" y2="12" stroke="currentColor" stroke-width="0.8" opacity="0.5"/>
-							<line x1="19" y1="17" x2="12" y2="12" stroke="currentColor" stroke-width="0.8" opacity="0.5"/>
-						</svg>
-					</div>
-					<div class="fa-bot-msg">
-						<span class="fa-msg-text">Hello! I'm your AI assistant. How can I help you today?</span>
-						<span class="fa-msg-time">${getTime()}</span>
-					</div>
-				</div>
-			</div>
+			<div id="fa-main">
 
-			<div id="fa-typing-indicator" style="display:none;">
-				<div class="fa-msg-wrap fa-bot-wrap">
-					<div class="fa-avatar fa-bot-avatar">
-						<svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-							<circle cx="12" cy="12" r="3" fill="currentColor"/>
-							<circle cx="5" cy="7" r="1.2" fill="currentColor" opacity="0.6"/>
-							<circle cx="19" cy="7" r="1.2" fill="currentColor" opacity="0.6"/>
-							<circle cx="5" cy="17" r="1.2" fill="currentColor" opacity="0.6"/>
-							<circle cx="19" cy="17" r="1.2" fill="currentColor" opacity="0.6"/>
-							<line x1="5" y1="7" x2="12" y2="12" stroke="currentColor" stroke-width="0.8" opacity="0.5"/>
-							<line x1="19" y1="7" x2="12" y2="12" stroke="currentColor" stroke-width="0.8" opacity="0.5"/>
-							<line x1="5" y1="17" x2="12" y2="12" stroke="currentColor" stroke-width="0.8" opacity="0.5"/>
-							<line x1="19" y1="17" x2="12" y2="12" stroke="currentColor" stroke-width="0.8" opacity="0.5"/>
-						</svg>
+				<div id="fa-header">
+					<div class="fa-header-left">
+						<div class="fa-status-dot"></div>
+						<div>
+							<div class="fa-title">FrappeAssist</div>
+							<div class="fa-subtitle">AI · Online</div>
+						</div>
 					</div>
-					<div class="fa-bot-msg fa-typing-bubble">
-						<span class="fa-dot"></span>
-						<span class="fa-dot"></span>
-						<span class="fa-dot"></span>
+					<div class="fa-header-actions">
+						<button class="fa-icon-btn" id="fa-clear" title="Clear chat">
+							<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+								<polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4h6v2"/>
+							</svg>
+						</button>
+						<button class="fa-icon-btn" id="fa-close" title="Close">
+							<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+								<line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+							</svg>
+						</button>
 					</div>
 				</div>
-			</div>
 
-			<div id="fa-input-area">
-				<div id="fa-input-wrap">
-					<textarea
-						id="fa-input"
-						placeholder="Ask anything..."
-						rows="1"
-					></textarea>
-					<button id="fa-send">
-						<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-							<line x1="22" y1="2" x2="11" y2="13"/>
-							<polygon points="22 2 15 22 11 13 2 9 22 2"/>
-						</svg>
-					</button>
+				<div id="fa-messages">
+					<div class="fa-msg-wrap fa-bot-wrap">
+						<div class="fa-avatar fa-bot-avatar">
+							<svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+								<circle cx="12" cy="12" r="3" fill="currentColor"/>
+								<circle cx="5" cy="7" r="1.2" fill="currentColor" opacity="0.6"/>
+								<circle cx="19" cy="7" r="1.2" fill="currentColor" opacity="0.6"/>
+								<circle cx="5" cy="17" r="1.2" fill="currentColor" opacity="0.6"/>
+								<circle cx="19" cy="17" r="1.2" fill="currentColor" opacity="0.6"/>
+								<line x1="5" y1="7" x2="12" y2="12" stroke="currentColor" stroke-width="0.8" opacity="0.5"/>
+								<line x1="19" y1="7" x2="12" y2="12" stroke="currentColor" stroke-width="0.8" opacity="0.5"/>
+								<line x1="5" y1="17" x2="12" y2="12" stroke="currentColor" stroke-width="0.8" opacity="0.5"/>
+								<line x1="19" y1="17" x2="12" y2="12" stroke="currentColor" stroke-width="0.8" opacity="0.5"/>
+							</svg>
+						</div>
+						<div class="fa-bot-msg">
+							<span class="fa-msg-text">Hello! I'm your AI assistant. How can I help you today?</span>
+							<span class="fa-msg-time">${getTime()}</span>
+						</div>
+					</div>
 				</div>
+
+				<div id="fa-typing-indicator" style="display:none;">
+					<div class="fa-msg-wrap fa-bot-wrap">
+						<div class="fa-avatar fa-bot-avatar">
+							<svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+								<circle cx="12" cy="12" r="3" fill="currentColor"/>
+								<circle cx="5" cy="7" r="1.2" fill="currentColor" opacity="0.6"/>
+								<circle cx="19" cy="7" r="1.2" fill="currentColor" opacity="0.6"/>
+								<circle cx="5" cy="17" r="1.2" fill="currentColor" opacity="0.6"/>
+								<circle cx="19" cy="17" r="1.2" fill="currentColor" opacity="0.6"/>
+								<line x1="5" y1="7" x2="12" y2="12" stroke="currentColor" stroke-width="0.8" opacity="0.5"/>
+								<line x1="19" y1="7" x2="12" y2="12" stroke="currentColor" stroke-width="0.8" opacity="0.5"/>
+								<line x1="5" y1="17" x2="12" y2="12" stroke="currentColor" stroke-width="0.8" opacity="0.5"/>
+								<line x1="19" y1="17" x2="12" y2="12" stroke="currentColor" stroke-width="0.8" opacity="0.5"/>
+							</svg>
+						</div>
+						<div class="fa-bot-msg fa-typing-bubble">
+							<span class="fa-dot"></span>
+							<span class="fa-dot"></span>
+							<span class="fa-dot"></span>
+						</div>
+					</div>
+				</div>
+
+				<div id="fa-input-area">
+					<div id="fa-input-wrap">
+						<textarea
+							id="fa-input"
+							placeholder="Ask anything..."
+							rows="1"
+						></textarea>
+						<button id="fa-send">
+							<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+								<line x1="22" y1="2" x2="11" y2="13"/>
+								<polygon points="22 2 15 22 11 13 2 9 22 2"/>
+							</svg>
+						</button>
+					</div>
+				</div>
+
 			</div>
 
 		</div>
@@ -120,6 +178,7 @@ $(document).ready(async function () {
 	let animFrame;
 	const particles = [];
 	const PARTICLE_COUNT = 28;
+
 
 	function resizeCanvas() {
 		canvas.width = canvas.offsetWidth;
@@ -232,10 +291,9 @@ $(document).ready(async function () {
 		`);
 	});
 
-	// ── char counter ─────────────────────────────────────────────────────────────
+	// ── input autosize ──────────────────────────────────────────────────────────
 	$(document).on("input", "#fa-input", function () {
 		autoResize();
-		$("#fa-char-count").text($(this).val().length);
 	});
 
 	// ── Send ─────────────────────────────────────────────────────────────────────
@@ -248,6 +306,7 @@ $(document).ready(async function () {
 		});
 
 		window.frappeassist_session = session.message.session_name;
+		loadSessions();
 	}
 		// User bubble
 		$("#fa-messages").append(`
@@ -335,6 +394,35 @@ $(document).ready(async function () {
 			.replace(/\n/g, "<br>");
 	}
 
+	$(document).on("click", ".fa-session", function () {
+
+		$(".fa-session").removeClass("active");
+		$(this).addClass("active");
+
+		const session_name = $(this).data("name");
+
+		window.frappeassist_session = session_name;
+
+		loadChatHistory(session_name);
+	});
+
+	$(document).on("click", "#fa-new-chat", function () {
+
+		$(".fa-session").removeClass("active");
+
+		window.frappeassist_session = null;
+
+		$("#fa-messages").html(`
+			<div class="fa-msg-wrap fa-bot-wrap">
+				<div class="fa-bot-msg">
+					<span class="fa-msg-text">
+						New conversation started.
+					</span>
+				</div>
+			</div>
+		`);
+	});
+
 	$(document).on("click", "#fa-send", sendMessage);
 
 	$(document).on("keydown", "#fa-input", function (e) {
@@ -395,8 +483,8 @@ $(document).ready(async function () {
 		position: fixed;
 		right: 28px;
 		bottom: 100px;
-		width: 390px;
-		height: 580px;
+		width: 680px;
+		height: 600px;
 		background: #0d1117;
 		border-radius: 20px;
 		box-shadow: 0 24px 64px rgba(0,0,0,0.55), inset 0 0 0 1px rgba(56,189,248,0.12);
@@ -404,7 +492,7 @@ $(document).ready(async function () {
 		overflow: hidden;
 		font-family: 'Inter', system-ui, sans-serif;
 		display: flex;
-		flex-direction: column;
+		flex-direction: row;
 		opacity: 0;
 		transform: translateY(20px) scale(0.96);
 		pointer-events: none;
@@ -427,10 +515,70 @@ $(document).ready(async function () {
 		opacity: 0.6;
 	}
 
-	/* ── Header ── */
-	#fa-header {
+	/* ── Sidebar ── */
+	#fa-sidebar {
 		position: relative;
 		z-index: 2;
+		width: 220px;
+		flex-shrink: 0;
+		background: #111827;
+		padding: 10px;
+		border-right: 1px solid rgba(255,255,255,.1);
+		display: flex;
+		flex-direction: column;
+	}
+
+	#fa-new-chat {
+		flex-shrink: 0;
+		width: 100%;
+		border: none;
+		padding: 10px;
+		border-radius: 8px;
+		background: #2563eb;
+		color: white;
+		cursor: pointer;
+	}
+
+	#fa-chat-list {
+		margin-top: 10px;
+		flex: 1;
+		overflow-y: auto;
+	}
+
+	.fa-session {
+		padding: 10px;
+		border-radius: 8px;
+		cursor: pointer;
+		color: white;
+		margin-bottom: 5px;
+		background: rgba(255,255,255,.05);
+		font-size: 13px;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+	}
+
+	.fa-session:hover {
+		background: rgba(255,255,255,.1);
+	}
+
+	.fa-session.active {
+		background: rgba(56,189,248,0.18);
+		border: 1px solid rgba(56,189,248,0.35);
+	}
+
+	/* ── Main column ── */
+	#fa-main {
+		position: relative;
+		z-index: 2;
+		flex: 1;
+		min-width: 0;
+		display: flex;
+		flex-direction: column;
+	}
+
+	/* ── Header ── */
+	#fa-header {
 		display: flex;
 		align-items: center;
 		justify-content: space-between;
@@ -469,7 +617,6 @@ $(document).ready(async function () {
 
 	/* ── Messages ── */
 	#fa-messages {
-		position: relative; z-index: 2;
 		flex: 1;
 		overflow-y: auto;
 		padding: 16px 14px 8px;
@@ -565,7 +712,6 @@ $(document).ready(async function () {
 
 	/* ── Input area ── */
 	#fa-input-area {
-		position: relative; z-index: 2;
 		padding: 10px 12px 12px;
 		background: rgba(13,17,23,0.9);
 		backdrop-filter: blur(12px);
@@ -620,5 +766,19 @@ $(document).ready(async function () {
 		letter-spacing: 0.01em;
 	}
 	#fa-typing-indicator { padding: 0 14px; }
+
+	/* ── Responsive: collapse sidebar on small screens ── */
+	@media (max-width: 720px) {
+		#frappeassist-chat {
+			width: 94vw;
+			height: 80vh;
+			right: 3vw;
+			bottom: 90px;
+		}
+		#fa-sidebar {
+			width: 140px;
+		}
+	}
 	</style>`);
+	loadSessions();
 });
